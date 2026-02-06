@@ -1,0 +1,1 @@
+g++ src/main.cpp glad.c -Iinclude -Llibs -lglfw3 -lopengl32 -lgdi32 -o build/main.exe
