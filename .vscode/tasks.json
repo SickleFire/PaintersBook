@@ -1,0 +1,51 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build (G++)",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "src/main.cpp",
+                "glad.c",
+                "-Iinclude",
+                "-Llibs",
+                "-lglfw3",
+                "-lopengl32",
+                "-lgdi32",
+                "-lassimp",
+                "-o",
+                "build/main.exe"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "Run Executable",
+            "type": "shell",
+            "command": ".\\build\\main.exe",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "dependsOn": ["Build (G++)"]
+        }
+    ]
+}
