@@ -8,6 +8,12 @@
             "args": [
                 "src/main.cpp",
                 "glad.c",
+                "include/imgui/imgui.cpp",
+                "include/imgui/imgui_draw.cpp",
+                "include/imgui/imgui_tables.cpp",
+                "include/imgui/imgui_widgets.cpp",
+                "include/imgui/imgui_impl_glfw.cpp",
+                "include/imgui/imgui_impl_opengl3.cpp",
                 "-Iinclude",
                 "-Llibs",
                 "-lglfw3",
