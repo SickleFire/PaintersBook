@@ -29,12 +29,15 @@ uniform vec3 lightColor;
 uniform vec3 objectColor;
 uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_specular1;
+uniform sampler2D texture_roughness1;
 
 
 
 void main()
 {
     vec4 diffuseColor = texture(texture_diffuse1, TexCoords);
+    vec4 specularColor = texture(texture_specular1, TexCoords);
+    vec4 roughnessColor = texture(texture_roughness1, TexCoords);
 
     // ambient
     vec3 ambient  = light.ambient * material.ambient;
@@ -48,8 +51,8 @@ void main()
     // specular
     vec3 viewDir = normalize(viewPos - FragPos);
     vec3 reflectDir = reflect(-lightDir, norm);  
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-    vec3 specular = light.specular * (spec * material.specular);   
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), (roughnessColor.r));
+    vec3 specular = light.specular * (spec * vec3(specularColor));   
         
     vec3 result = ambient + diffuse + specular;
 
