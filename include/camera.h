@@ -17,7 +17,7 @@ enum Camera_Movement {
 const float YAW         = -90.0f;
 const float PITCH       =  0.0f;
 const float SPEED       =  2.5f;
-const float SENSITIVITY =  0.1f;
+const float SENSITIVITY =  0.2f;
 const float ZOOM        =  45.0f;
 
 
@@ -38,6 +38,10 @@ public:
     float MovementSpeed;
     float MouseSensitivity;
     float Zoom;
+    // orbit variables
+    glm::vec3 Target = glm::vec3(0.0f, 0.0f, 0.0f); // subject center
+    float Radius = 5.0f;   // distance from target
+
 
     // constructor with vectors
     Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
@@ -97,7 +101,18 @@ public:
         }
 
         // update Front, Right and Up Vectors using the updated Euler angles
-        updateCameraVectors();
+        //updateCameraVectors();
+        // Convert spherical coordinates to Cartesian
+        float x = Radius * cos(glm::radians(Pitch)) * cos(glm::radians(Yaw));
+        float y = Radius * sin(glm::radians(Pitch));
+        float z = Radius * cos(glm::radians(Pitch)) * sin(glm::radians(Yaw));
+
+        Position = Target + glm::vec3(x, y, z);
+
+        // Always look at the target
+        Front = glm::normalize(Target - Position);
+        Right = glm::normalize(glm::cross(Front, WorldUp));
+        Up    = glm::normalize(glm::cross(Right, Front));
     }
 
     // processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
