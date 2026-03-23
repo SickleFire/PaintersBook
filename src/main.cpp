@@ -16,11 +16,14 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 1600;
+const unsigned int SCR_HEIGHT = 900;
 static float rotation = 0.0f;
+static float lightrotationx = 0.0f;
+static float lightrotationy = 0.0f;
 bool cursorEnabled = true;
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -34,6 +37,7 @@ float lastFrame = 0.0f;
 
 // lighting
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec4 rotatedPos(0.0f, 0.0f, 0.0f, 0.0f);
 
 int main()
 {
@@ -46,7 +50,7 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Painter's Book", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -57,8 +61,9 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    glfwSetKeyCallback(window, key_callback);
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     stbi_set_flip_vertically_on_load(true);
 
     // glad: load all OpenGL function pointers
@@ -153,7 +158,7 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    Model ourModel("../resources/backpack.obj");
+    Model ourModel("../resources/AsaroHead.obj");
 
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -178,18 +183,22 @@ int main()
 
         // render
         // ------
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor(0.427f, 0.506f, 0.588f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // be sure to activate shader when setting uniforms/drawing objects
         lightingShader.use();
-        lightingShader.setVec3("material.ambient", 1.0f, 0.5f, 0.31f);
+        lightingShader.setBool("material.useTexture", false);
+        lightingShader.setVec3("material.ambient", 1.0f, 1.0f, 1.0f);
+        lightingShader.setVec3("material.diffuse", 1.0f, 1.0f, 1.0f);
+        lightingShader.setVec3("material.specular", 0.5f, 0.5f, 0.5f);
+        lightingShader.setFloat("material.shininess", 32.0f);
         lightingShader.setVec3("light.ambient",  0.1f, 0.1f, 0.1f);
         lightingShader.setVec3("light.diffuse",  0.5f, 0.5f, 0.5f); // darken diffuse light a bit
         lightingShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f); 
         lightingShader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
-        lightingShader.setVec3("lightPos", lightPos);
+        lightingShader.setVec3("lightPos", rotatedPos);
         lightingShader.setVec3("viewPos", camera.Position); 
 
         // view/projection transformations
@@ -210,6 +219,12 @@ int main()
         lightCubeShader.setMat4("projection", projection);
         lightCubeShader.setMat4("view", view);
         model = glm::mat4(1.0f);
+        model = glm::rotate(model, lightrotationx, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, lightrotationy, glm::vec3(1.0f, 0.0f, 0.0f));
+        rotatedPos = model * glm::vec4(lightPos, 1.0f);
+        lightingShader.use();
+        lightingShader.setVec3("lightPos", glm::vec3(rotatedPos));
+        lightCubeShader.use();
         model = glm::translate(model, lightPos);
         model = glm::scale(model, glm::vec3(0.2f)); // a smaller cube
         lightCubeShader.setMat4("model", model);
@@ -221,9 +236,15 @@ int main()
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-            ImGui::SliderFloat("float", &rotation, 0.0f, 2.0f * M_PI);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::Begin("Painter's Book");                         
+            if (!cursorEnabled){
+                ImGui::Text("Light Mode");
+            }else{
+                ImGui::Text("Camera Mode");
+            }
+            ImGui::SliderFloat("model rotation", &rotation, 0.0f, 2.0f * M_PI);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::SliderFloat("light rotation x", &lightrotationx, 0.0f, 2.0f * M_PI);
+            ImGui::SliderFloat("light rotation y", &lightrotationy, 0.0f, 2.0f * M_PI);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
@@ -263,10 +284,6 @@ void processInput(GLFWwindow *window)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
-        cursorEnabled = !cursorEnabled;
-        glfwSetInputMode(window, GLFW_CURSOR, cursorEnabled ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
-    }
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -295,10 +312,19 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
     lastX = xpos;
     lastY = ypos;
-    camera.ProcessMouseMovement(xoffset, yoffset);
+    if (cursorEnabled){
+        camera.ProcessMouseMovement(xoffset, yoffset);
+    }
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
+}
+
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods){
+    if (key == GLFW_KEY_E && action == GLFW_PRESS){
+        cursorEnabled = !cursorEnabled;
+        glfwSetInputMode(window, GLFW_CURSOR, cursorEnabled ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    }
 }
