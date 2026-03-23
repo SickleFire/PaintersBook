@@ -10,11 +10,11 @@ Painter's Book can save your 3D figures or models, references and render your su
 
 [Progress]
   - Main Prototype [DONE]
-  - camera orbit using buttons.
+  - camera orbit using mouse. [DONE]
   - camera zoom and pan.
   - save different 3D models.
   - 5 different models.
-  - lighting position settings.
+  - lighting position settings. [DONE]
   - lighting colors settings.
 
 [NEXT STEP]
