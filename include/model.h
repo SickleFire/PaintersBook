@@ -31,7 +31,6 @@ public:
     vector<Mesh>    meshes;
     string directory;
     bool gammaCorrection;
-
     // constructor, expects a filepath to a 3D model.
     Model(string const &path, bool gamma = false) : gammaCorrection(gamma)
     {
@@ -41,8 +40,14 @@ public:
     // draws the model, and thus all its meshes
     void Draw(Shader &shader)
     {
-        for(unsigned int i = 0; i < meshes.size(); i++)
+        for(unsigned int i = 0; i < meshes.size(); i++){
+            if (meshes[i].textures.empty()){
+                shader.setBool("material.useTexture", false);
+            }else{
+                shader.setBool("material.useTexture", true);
+            }
             meshes[i].Draw(shader);
+        }
     }
     
 private:

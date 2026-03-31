@@ -43,12 +43,12 @@ void main()
         diffuseColor = vec4(material.diffuse, 1.0);
     }
     vec4 specularColor = texture(texture_specular1, TexCoords);
-    if (specularColor == vec4(0.0)) {
+    if (!material.useTexture) {
         specularColor = vec4(material.specular, 1.0);
     }
 
     float roughnessColor = texture(texture_roughness1, TexCoords).r;
-    if (roughnessColor == 0.0) {
+    if (!material.useTexture) {
         roughnessColor = material.shininess;
     }
 

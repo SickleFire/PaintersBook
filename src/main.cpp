@@ -11,6 +11,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
+#include <files.h>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -27,6 +28,9 @@ static float lightrotationy = 0.0f;
 bool cursorEnabled = true;
 bool useBanding =false;
 int bandLevels = 3;
+static int current_model = 0;
+static std::vector<std::string> models;
+
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
@@ -160,6 +164,8 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
+    models = loadModelFiles("../resources");
+
     Model ourModel("../resources/AsaroHead.obj");
 
     ImGui::CreateContext();
@@ -190,7 +196,6 @@ int main()
 
         // be sure to activate shader when setting uniforms/drawing objects
         lightingShader.use();
-        lightingShader.setBool("material.useTexture", false);
         lightingShader.setVec3("material.ambient", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("material.diffuse", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("material.specular", 0.5f, 0.5f, 0.5f);
@@ -259,6 +264,19 @@ int main()
             ImGui::SliderInt("Band Levels", &bandLevels, 1, 6);
             if (ImGui::Button("Toggle Banding Mode")) {
                 useBanding = !useBanding;
+            }
+
+            if (ImGui::BeginCombo("Select Model", models[current_model].c_str())) {
+                for (int n = 0; n < models.size(); n++) {
+                    bool is_selected = (current_model == n);
+                    if (ImGui::Selectable(models[n].c_str(), is_selected)) {
+                        current_model = n;
+                        ourModel = Model(models[current_model]);
+                    }
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
             }
             
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
