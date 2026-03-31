@@ -15,8 +15,9 @@ struct Light {
 };
 
 uniform Light light;  
-  
 uniform Material material;
+uniform bool useBanding;
+uniform int bandLevels;
 
 out vec4 FragColor;
 
@@ -51,7 +52,6 @@ void main()
         roughnessColor = material.shininess;
     }
 
-    
     // ambient
     vec3 ambient  = light.ambient * material.ambient;
   	
@@ -68,6 +68,12 @@ void main()
     vec3 specular = light.specular * (spec * vec3(specularColor));   
         
     vec3 result = ambient + diffuse + specular;
+    if (useBanding){
+        float intensity = max(dot(norm, lightDir), 0.0);
+        float levels = bandLevels; // number of bands
+        float band = floor(intensity * levels) / levels;
+        result = diffuseColor.rgb * band;
+    }
 
     FragColor = diffuseColor * vec4(result, 1.0);
 } 

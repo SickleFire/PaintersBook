@@ -25,6 +25,8 @@ static float rotation = 0.0f;
 static float lightrotationx = 0.0f;
 static float lightrotationy = 0.0f;
 bool cursorEnabled = true;
+bool useBanding =false;
+int bandLevels = 3;
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
@@ -38,6 +40,7 @@ float lastFrame = 0.0f;
 // lighting
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 glm::vec4 rotatedPos(0.0f, 0.0f, 0.0f, 0.0f);
+ImVec4 ambientLightColor = ImVec4(0.1f, 0.1f, 0.1f, 0.1f);
 
 int main()
 {
@@ -84,7 +87,6 @@ int main()
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -193,13 +195,15 @@ int main()
         lightingShader.setVec3("material.diffuse", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("material.specular", 0.5f, 0.5f, 0.5f);
         lightingShader.setFloat("material.shininess", 32.0f);
-        lightingShader.setVec3("light.ambient",  0.1f, 0.1f, 0.1f);
+        lightingShader.setVec3("light.ambient",  ambientLightColor.x, ambientLightColor.y, ambientLightColor.z);
         lightingShader.setVec3("light.diffuse",  0.5f, 0.5f, 0.5f); // darken diffuse light a bit
         lightingShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f); 
         lightingShader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("lightPos", rotatedPos);
         lightingShader.setVec3("viewPos", camera.Position); 
+        lightingShader.setBool("useBanding", useBanding);
+        lightingShader.setInt("bandLevels", bandLevels);
 
         // view/projection transformations
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -242,10 +246,21 @@ int main()
             }else{
                 ImGui::Text("Camera Mode");
             }
+            ImGui::Text("Model Transform");
             ImGui::SliderFloat("model rotation", &rotation, 0.0f, 2.0f * M_PI);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::Text("Light Settings");
             ImGui::SliderFloat("light rotation x", &lightrotationx, 0.0f, 2.0f * M_PI);
             ImGui::SliderFloat("light rotation y", &lightrotationy, 0.0f, 2.0f * M_PI);
-
+            ImGui::ColorEdit3("Ambient Light", (float*)&ambientLightColor);
+            if (ImGui::Button("Reset Ambient Light")){
+                ambientLightColor = ImVec4(0.1f, 0.1f, 0.1f, 0.1f);
+            }
+            ImGui::Text("Banding Settings");
+            ImGui::SliderInt("Band Levels", &bandLevels, 1, 6);
+            if (ImGui::Button("Toggle Banding Mode")) {
+                useBanding = !useBanding;
+            }
+            
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
