@@ -1,3 +1,5 @@
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
@@ -13,6 +15,7 @@
 #include <imgui/imgui_impl_opengl3.h>
 #include <files.h>
 
+void writeScreenShot(GLFWwindow* window);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -26,7 +29,7 @@ static float rotation = 0.0f;
 static float lightrotationx = 0.0f;
 static float lightrotationy = 0.0f;
 bool cursorEnabled = true;
-bool useBanding =false;
+bool useBanding = false;
 int bandLevels = 3;
 static int current_model = 0;
 static std::vector<std::string> models;
@@ -46,6 +49,25 @@ glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 glm::vec4 rotatedPos(0.0f, 0.0f, 0.0f, 0.0f);
 ImVec4 ambientLightColor = ImVec4(0.1f, 0.1f, 0.1f, 0.1f);
 
+// Grid Lines
+bool showGrid = false;
+glm::mat4 ortho = glm::ortho(0.0f, (float)SCR_WIDTH,
+                             0.0f, (float)SCR_HEIGHT);
+std::vector<float> gridLines = {
+    // vertical lines
+    SCR_WIDTH/3.0f, 0.0f,
+    SCR_WIDTH/3.0f, SCR_HEIGHT,
+
+    2*SCR_WIDTH/3.0f, 0.0f,
+    2*SCR_WIDTH/3.0f, SCR_HEIGHT,
+
+    // horizontal lines
+    0.0f, SCR_HEIGHT/3.0f,
+    SCR_WIDTH, SCR_HEIGHT/3.0f,
+
+    0.0f, 2*SCR_HEIGHT/3.0f,
+    SCR_WIDTH, 2*SCR_HEIGHT/3.0f
+};
 int main()
 {
     // glfw: initialize and configure
@@ -87,6 +109,7 @@ int main()
     // ------------------------------------
     Shader lightingShader("../shaders/colors.vs", "../shaders/colors.fs");
     Shader lightCubeShader("../shaders/light_cube.vs", "../shaders/light_cube.fs");
+    Shader shaderGrid("../shaders/grid.vs", "../shaders/grid.fs");
 
     bool show_demo_window = true;
     bool show_another_window = false;
@@ -137,7 +160,7 @@ int main()
         -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
         -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
 };
-    unsigned int VBO, cubeVAO;
+    unsigned int VBO, cubeVAO, gridVAO, gridVBO;
     glGenVertexArrays(1, &cubeVAO);
     glGenBuffers(1, &VBO);
 
@@ -162,6 +185,14 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glGenVertexArrays(1, &gridVAO);
+    glGenBuffers(1, &gridVBO);
+    glBindVertexArray(gridVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, gridVBO);
+    glBufferData(GL_ARRAY_BUFFER, gridLines.size() * sizeof(float), &gridLines[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     models = loadModelFiles("../resources");
@@ -240,6 +271,17 @@ int main()
 
         glBindVertexArray(lightCubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        if (showGrid) {
+            glDisable(GL_DEPTH_TEST); // overlay
+            shaderGrid.use();
+            shaderGrid.setMat4("projection", ortho);
+            shaderGrid.setVec3("gridColor", glm::vec3(1.0f, 1.0f, 1.0f)); // white lines
+
+            glBindVertexArray(gridVAO);
+            glDrawArrays(GL_LINES, 0, gridLines.size()/2);
+            glEnable(GL_DEPTH_TEST);
+        }
         
         {
             static float f = 0.0f;
@@ -265,7 +307,13 @@ int main()
             if (ImGui::Button("Toggle Banding Mode")) {
                 useBanding = !useBanding;
             }
-
+            ImGui::Text("Misc");
+            if (ImGui::Button("Toggle Grid")) {
+                showGrid = !showGrid;
+            }
+            if (ImGui::Button("Take Screenshot")) {
+                writeScreenShot(window);
+            }
             if (ImGui::BeginCombo("Select Model", models[current_model].c_str())) {
                 for (int n = 0; n < models.size(); n++) {
                     bool is_selected = (current_model == n);
@@ -360,4 +408,27 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
         cursorEnabled = !cursorEnabled;
         glfwSetInputMode(window, GLFW_CURSOR, cursorEnabled ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
     }
+}
+
+void writeScreenShot(GLFWwindow* window) {
+    // Get the current framebuffer size
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+
+    // Create a buffer to hold the pixel data
+    std::vector<unsigned char> pixels(width * height * 3); // 3 channels (RGB)
+
+    // Read the pixels from the framebuffer
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+    // Flip the image vertically (OpenGL's origin is bottom-left)
+    std::vector<unsigned char> flippedPixels(width * height * 3);
+    for (int y = 0; y < height; ++y) {
+        std::copy(pixels.begin() + y * width * 3,
+                  pixels.begin() + (y + 1) * width * 3,
+                  flippedPixels.begin() + (height - 1 - y) * width * 3);
+    }
+
+    // Save the image using stb_image_write
+    stbi_write_png("screenshot.png", width, height, 3, flippedPixels.data(), width * 3);
 }
