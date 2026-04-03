@@ -13,8 +13,9 @@ struct Light {
     vec3 diffuse;
     vec3 specular;
 };
-
-uniform Light light;  
+#define MAX_LIGHTS 8
+uniform Light lights[MAX_LIGHTS];
+uniform int numLights;
 uniform Material material;
 uniform bool useBanding;
 uniform int bandLevels;
@@ -35,6 +36,23 @@ uniform sampler2D texture_roughness1;
 
 vec4 diffuseColor;
 
+vec3 CalcLight(Light light, vec3 norm, vec3 viewDir, vec3 diffuseRGB, vec3 specularRGB, float roughness){
+    // ambient
+    vec3 ambient  = light.ambient * material.ambient;
+
+    // diffuse 
+    vec3 lightDir = normalize(light.position - FragPos);
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 diffuse  = light.diffuse * (diff * vec3(diffuseRGB));
+
+    // specular
+    vec3 reflectDir = reflect(-lightDir, norm);  
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), (roughness));
+    vec3 specular = light.specular * (spec * vec3(specularRGB));   
+
+    return ambient + diffuse + specular;
+}
+
 void main()
 {
     if (material.useTexture){
@@ -51,29 +69,25 @@ void main()
     if (!material.useTexture) {
         roughnessColor = material.shininess;
     }
-
-    // ambient
-    vec3 ambient  = light.ambient * material.ambient;
-  	
-    // diffuse 
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(lightPos - FragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse  = light.diffuse * (diff * vec3(diffuseColor));
-    
-    // specular
     vec3 viewDir = normalize(viewPos - FragPos);
-    vec3 reflectDir = reflect(-lightDir, norm);  
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), (roughnessColor));
-    vec3 specular = light.specular * (spec * vec3(specularColor));   
-        
-    vec3 result = ambient + diffuse + specular;
+
+    vec3 result = vec3(0.0);
     if (useBanding){
-        float intensity = max(dot(norm, lightDir), 0.0);
         float levels = bandLevels; // number of bands
-        float band = floor(intensity * levels) / levels;
-        result = diffuseColor.rgb * band;
+        for (int i = 0; i < numLights; i++)
+        {
+            vec3 lightDir = normalize(lights[i].position - FragPos);
+            float intensity = max(dot(norm, lightDir), 0.0);
+            float band = floor(intensity * levels) / levels;
+            result += diffuseColor.rgb * band;
+        }
+    }else {
+        for (int i = 0; i < numLights; i++){
+            result += CalcLight(lights[i], norm, viewDir, vec3(diffuseColor), vec3(specularColor), roughnessColor);
+        }
     }
 
-    FragColor = diffuseColor * vec4(result, 1.0);
+    FragColor = vec4(result, diffuseColor.a);
 } 
+

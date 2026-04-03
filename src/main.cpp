@@ -231,9 +231,20 @@ int main()
         lightingShader.setVec3("material.diffuse", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("material.specular", 0.5f, 0.5f, 0.5f);
         lightingShader.setFloat("material.shininess", 32.0f);
-        lightingShader.setVec3("light.ambient",  ambientLightColor.x, ambientLightColor.y, ambientLightColor.z);
-        lightingShader.setVec3("light.diffuse",  0.5f, 0.5f, 0.5f); // darken diffuse light a bit
-        lightingShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f); 
+        int numLights = 2; // however many you have
+        lightingShader.setInt("numLights", numLights);
+
+        // light 0
+        lightingShader.setVec3("lights[0].position", rotatedPos);
+        lightingShader.setVec3("lights[0].ambient",  glm::vec3(ambientLightColor.x, ambientLightColor.y, ambientLightColor.z));
+        lightingShader.setVec3("lights[0].diffuse",  0.5f, 0.5f, 0.5f);
+        lightingShader.setVec3("lights[0].specular", 1.0f, 1.0f, 1.0f);
+
+        // light 1
+        lightingShader.setVec3("lights[1].position", glm::vec3(5.0f, 2.0f, 0.0f));
+        lightingShader.setVec3("lights[1].ambient",  0.1f, 0.1f, 0.1f);
+        lightingShader.setVec3("lights[1].diffuse",  0.5f, 0.5f, 0.5f);
+        lightingShader.setVec3("lights[1].specular", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("lightPos", rotatedPos);
