@@ -201,9 +201,41 @@ int main()
 
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+    // lock to the right side
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - 300, 0));
+    ImGui::SetNextWindowSize(ImVec2(300, io.DisplaySize.y));
+
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
     ImGui::StyleColorsDark();
+    {
+        ImGuiStyle& style = ImGui::GetStyle();
+
+        // rounding
+        style.WindowRounding = 8.0f;
+        style.FrameRounding = 4.0f;
+        style.GrabRounding = 4.0f;
+        style.ScrollbarRounding = 4.0f;
+        style.TabRounding = 4.0f;
+
+        // padding and spacing
+        style.WindowPadding = ImVec2(12, 12);
+        style.FramePadding = ImVec2(8, 4);
+        style.ItemSpacing = ImVec2(8, 6);
+
+        // colors - dark warm theme, friendlier for artists
+        ImVec4* colors = style.Colors;
+        colors[ImGuiCol_WindowBg]         = ImVec4(0.13f, 0.12f, 0.12f, 1.00f);
+        colors[ImGuiCol_FrameBg]          = ImVec4(0.20f, 0.18f, 0.18f, 1.00f);
+        colors[ImGuiCol_FrameBgHovered]   = ImVec4(0.30f, 0.27f, 0.27f, 1.00f);
+        colors[ImGuiCol_TitleBgActive]    = ImVec4(0.25f, 0.22f, 0.22f, 1.00f);
+        colors[ImGuiCol_Button]           = ImVec4(0.35f, 0.28f, 0.28f, 1.00f);
+        colors[ImGuiCol_ButtonHovered]    = ImVec4(0.45f, 0.36f, 0.36f, 1.00f);
+        colors[ImGuiCol_SliderGrab]       = ImVec4(0.70f, 0.45f, 0.35f, 1.00f);
+        colors[ImGuiCol_CheckMark]        = ImVec4(0.70f, 0.45f, 0.35f, 1.00f);
+        colors[ImGuiCol_Header]           = ImVec4(0.35f, 0.28f, 0.28f, 1.00f);
+        colors[ImGuiCol_HeaderHovered]    = ImVec4(0.45f, 0.36f, 0.36f, 1.00f);
+    }
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -298,7 +330,12 @@ int main()
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Painter's Book");                         
+            ImGui::Begin("Painter's Book", nullptr,
+                            ImGuiWindowFlags_NoResize   |
+                            ImGuiWindowFlags_NoMove     |
+                            ImGuiWindowFlags_NoCollapse |
+                            ImGuiWindowFlags_NoBringToFrontOnFocus
+            );                         
             if (!cursorEnabled){
                 ImGui::Text("Light Mode");
             }else{
@@ -411,7 +448,9 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    camera.ProcessMouseScroll(static_cast<float>(yoffset));
+    if (cursorEnabled){
+        camera.ProcessMouseScroll(static_cast<float>(yoffset));
+    }
 }
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods){
