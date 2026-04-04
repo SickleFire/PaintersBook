@@ -15,6 +15,7 @@
 #include <imgui/imgui_impl_opengl3.h>
 #include <files.h>
 
+
 void writeScreenShot(GLFWwindow* window);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -26,8 +27,6 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 const unsigned int SCR_WIDTH = 1600;
 const unsigned int SCR_HEIGHT = 900;
 static float rotation = 0.0f;
-static float lightrotationx = 0.0f;
-static float lightrotationy = 0.0f;
 bool cursorEnabled = true;
 bool useBanding = false;
 int bandLevels = 3;
@@ -48,6 +47,49 @@ float lastFrame = 0.0f;
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 glm::vec4 rotatedPos(0.0f, 0.0f, 0.0f, 0.0f);
 ImVec4 ambientLightColor = ImVec4(0.1f, 0.1f, 0.1f, 0.1f);
+struct LightSettings {
+    bool isEnabled = true;
+    float rotationY = 0.0f;  
+    float rotationX = 0.0f;  
+    float distance  = 3.0f;  // how far from the model
+    glm::vec3 diffuse  = glm::vec3(0.5f, 0.5f, 0.5f);
+    glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
+    float intensity = 1.0f;
+};
+
+struct LightPreset {
+    std::string name;
+    std::vector<LightSettings> lights;
+};
+
+std::vector<LightPreset> presets = {
+    {
+        "Rembrandt", {
+            { true, glm::radians(45.0f),  glm::radians(30.0f), 3.0f, glm::vec3(0.5f, 0.45f, 0.4f), glm::vec3(1.0f), 1.0f },
+        }
+    },
+    {
+        "Three Point", {
+            { true, glm::radians(45.0f),  glm::radians(30.0f), 3.0f, glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(1.0f), 1.0f  }, // key
+            { true, glm::radians(-45.0f), glm::radians(15.0f), 4.0f, glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(0.0f), 0.5f  }, // fill
+            { true, glm::radians(180.0f), glm::radians(20.0f), 3.0f, glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(1.0f), 0.75f }, // rim
+        }
+    },
+    {
+        "Top Down", {
+            { true, glm::radians(0.0f), glm::radians(90.0f), 3.0f, glm::vec3(0.5f), glm::vec3(1.0f), 1.0f },
+        }
+    },
+    {
+        "Split", {
+            { true, glm::radians(90.0f),  glm::radians(30.0f), 3.0f, glm::vec3(1.0f), glm::vec3(1.0f), 1.0f },
+            { true, glm::radians(-90.0f), glm::radians(30.0f), 3.0f, glm::vec3(1.0f), glm::vec3(1.0f), 1.0f },
+        }
+    },
+};
+
+glm::vec3 getLightPosition(const LightSettings& light);
+std::vector<LightSettings> lights;
 
 // Grid Lines
 bool showGrid = false;
@@ -236,6 +278,10 @@ int main()
         colors[ImGuiCol_Header]           = ImVec4(0.35f, 0.28f, 0.28f, 1.00f);
         colors[ImGuiCol_HeaderHovered]    = ImVec4(0.45f, 0.36f, 0.36f, 1.00f);
     }
+
+    //push 1 main light to the scene
+    lights.push_back(LightSettings());
+    lights[0].rotationY = glm::radians(45.0f);  lights[0].rotationX = glm::radians(30.0f);
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -263,23 +309,22 @@ int main()
         lightingShader.setVec3("material.diffuse", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("material.specular", 0.5f, 0.5f, 0.5f);
         lightingShader.setFloat("material.shininess", 32.0f);
-        int numLights = 2; // however many you have
-        lightingShader.setInt("numLights", numLights);
+        lightingShader.setInt("numLights", lights.size());
 
-        // light 0
-        lightingShader.setVec3("lights[0].position", rotatedPos);
-        lightingShader.setVec3("lights[0].ambient",  glm::vec3(ambientLightColor.x, ambientLightColor.y, ambientLightColor.z));
-        lightingShader.setVec3("lights[0].diffuse",  0.5f, 0.5f, 0.5f);
-        lightingShader.setVec3("lights[0].specular", 1.0f, 1.0f, 1.0f);
+        for (int i = 0; i < lights.size(); i++)
+        {
+            string name = "lights[" + std::to_string(i) + "]";
+            glm::vec3 position = getLightPosition(lights[i]);
+            glm::vec3 diffuse = lights[i].diffuse;
+            glm::vec3 specular = lights[i].specular;
+            float intensity = lights[i].intensity;
+            lightingShader.setBool(name + ".isEnabled", lights[i].isEnabled);
+            lightingShader.setVec3(name + ".position", position);
+            lightingShader.setVec3(name + ".diffuse", diffuse);
+            lightingShader.setVec3(name + ".specular", specular);
+            lightingShader.setVec3(name + ".ambient", 0.1f, 0.1f, 0.1f);
+        }
 
-        // light 1
-        lightingShader.setVec3("lights[1].position", glm::vec3(5.0f, 2.0f, 0.0f));
-        lightingShader.setVec3("lights[1].ambient",  0.1f, 0.1f, 0.1f);
-        lightingShader.setVec3("lights[1].diffuse",  0.5f, 0.5f, 0.5f);
-        lightingShader.setVec3("lights[1].specular", 1.0f, 1.0f, 1.0f);
-        lightingShader.setVec3("objectColor", 1.0f, 1.0f, 1.0f);
-        lightingShader.setVec3("lightColor",  1.0f, 1.0f, 1.0f);
-        lightingShader.setVec3("lightPos", rotatedPos);
         lightingShader.setVec3("viewPos", camera.Position); 
         lightingShader.setBool("useBanding", useBanding);
         lightingShader.setInt("bandLevels", bandLevels);
@@ -297,23 +342,24 @@ int main()
         lightingShader.setMat4("model", model);
         ourModel.Draw(lightingShader); 
 
-        // also draw the lamp object
-        lightCubeShader.use();
-        lightCubeShader.setMat4("projection", projection);
-        lightCubeShader.setMat4("view", view);
-        model = glm::mat4(1.0f);
-        model = glm::rotate(model, lightrotationx, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, lightrotationy, glm::vec3(1.0f, 0.0f, 0.0f));
-        rotatedPos = model * glm::vec4(lightPos, 1.0f);
-        lightingShader.use();
-        lightingShader.setVec3("lightPos", glm::vec3(rotatedPos));
-        lightCubeShader.use();
-        model = glm::translate(model, lightPos);
-        model = glm::scale(model, glm::vec3(0.2f)); // a smaller cube
-        lightCubeShader.setMat4("model", model);
-
-        glBindVertexArray(lightCubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        for (int i = 0; i < lights.size(); i++) {
+            if (!lights[i].isEnabled){
+                continue;
+            }
+            glm::vec3 position = getLightPosition(lights[i]);
+        
+            lightCubeShader.use();
+            lightCubeShader.setMat4("projection", projection);
+            lightCubeShader.setMat4("view", view);
+        
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, position);
+            model = glm::scale(model, glm::vec3(0.2f));
+            lightCubeShader.setMat4("model", model);
+        
+            glBindVertexArray(lightCubeVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
 
         if (showGrid) {
             glDisable(GL_DEPTH_TEST); // overlay
@@ -341,27 +387,7 @@ int main()
             }else{
                 ImGui::Text("Camera Mode");
             }
-            ImGui::Text("Model Transform");
-            ImGui::SliderFloat("model rotation", &rotation, 0.0f, 2.0f * M_PI);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::Text("Light Settings");
-            ImGui::SliderFloat("light rotation x", &lightrotationx, 0.0f, 2.0f * M_PI);
-            ImGui::SliderFloat("light rotation y", &lightrotationy, 0.0f, 2.0f * M_PI);
-            ImGui::ColorEdit3("Ambient Light", (float*)&ambientLightColor);
-            if (ImGui::Button("Reset Ambient Light")){
-                ambientLightColor = ImVec4(0.1f, 0.1f, 0.1f, 0.1f);
-            }
-            ImGui::Text("Banding Settings");
-            ImGui::SliderInt("Band Levels", &bandLevels, 1, 6);
-            if (ImGui::Button("Toggle Banding Mode")) {
-                useBanding = !useBanding;
-            }
-            ImGui::Text("Misc");
-            if (ImGui::Button("Toggle Grid")) {
-                showGrid = !showGrid;
-            }
-            if (ImGui::Button("Take Screenshot")) {
-                writeScreenShot(window);
-            }
+            ImGui::Text("Model Settings");
             if (ImGui::BeginCombo("Select Model", models[current_model].c_str())) {
                 for (int n = 0; n < models.size(); n++) {
                     bool is_selected = (current_model == n);
@@ -373,6 +399,62 @@ int main()
                         ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
+            }
+            ImGui::SliderFloat("model rotation", &rotation, 0.0f, 2.0f * M_PI);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::Text("Light Settings");
+            if (ImGui::Button("Add Light") && lights.size() < 8) {
+                lights.push_back(LightSettings());
+            }
+            for (int i = 0; i < lights.size(); i++) {
+                ImGui::PushID(i); // critical - makes each section unique
+
+                std::string header = "Light " + std::to_string(i);
+                if (ImGui::CollapsingHeader(header.c_str())) {
+                    ImGui::Checkbox("Enabled", &lights[i].isEnabled);
+
+                    ImGui::SliderFloat("Horizontal", &lights[i].rotationY, 0.0f, 2.0f * M_PI);
+                    ImGui::SliderFloat("Elevation",  &lights[i].rotationX, -M_PI * 0.5f, M_PI * 0.5f);
+                    ImGui::SliderFloat("Distance",   &lights[i].distance,  0.5f, 10.0f);
+
+                    ImGui::ColorEdit3("Diffuse",  glm::value_ptr(lights[i].diffuse));
+                    ImGui::ColorEdit3("Specular", glm::value_ptr(lights[i].specular));
+                    ImGui::SliderFloat("Intensity", &lights[i].intensity, 0.0f, 2.0f);
+
+                    if (ImGui::Button("Key"))  { lights[i].rotationY = glm::radians(45.0f);  lights[i].rotationX = glm::radians(30.0f); }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Fill")) { lights[i].rotationY = glm::radians(-45.0f); lights[i].rotationX = glm::radians(15.0f); }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Rim"))  { lights[i].rotationY = glm::radians(180.0f); lights[i].rotationX = glm::radians(20.0f); }
+                
+                    if (ImGui::Button("Remove")) {
+                        lights.erase(lights.begin() + i);
+                        i--; // step back so we don't skip the next light
+                    }
+                }
+            
+                ImGui::PopID();
+            }
+
+            ImGui::Text("Lighting Presets");
+            for (int i = 0; i < presets.size(); i++) {
+                if (ImGui::Button(presets[i].name.c_str())) {
+                    lights = presets[i].lights; // replace current lights with preset
+                }
+                if (i < presets.size() - 1) ImGui::SameLine();
+            }
+            ImGui::Separator();
+
+            ImGui::Text("Banding Settings");
+            ImGui::SliderInt("Band Levels", &bandLevels, 1, 6);
+            if (ImGui::Button("Toggle Banding Mode")) {
+                useBanding = !useBanding;
+            }
+            ImGui::Text("Misc");
+            if (ImGui::Button("Toggle Grid")) {
+                showGrid = !showGrid;
+            }
+            if (ImGui::Button("Take Screenshot")) {
+                writeScreenShot(window);
             }
             
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
@@ -481,4 +563,11 @@ void writeScreenShot(GLFWwindow* window) {
 
     // Save the image using stb_image_write
     stbi_write_png("screenshot.png", width, height, 3, flippedPixels.data(), width * 3);
+}
+
+glm::vec3 getLightPosition(const LightSettings& light) {
+    float x = light.distance * cos(light.rotationX) * sin(light.rotationY);
+    float y = light.distance * sin(light.rotationX);
+    float z = light.distance * cos(light.rotationX) * cos(light.rotationY);
+    return glm::vec3(x, y, z);
 }
