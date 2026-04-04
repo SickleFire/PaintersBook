@@ -18,3 +18,6 @@ Painter's Book can save your 3D figures or models, references and render your su
   - lighting colors settings. [DONE]
   - Preset Systems for Lighting. [DONE]
   - Snapshot export. [DONE]
+    
+[NEXT STEP]
+  - Add Shadows for shadow study.
