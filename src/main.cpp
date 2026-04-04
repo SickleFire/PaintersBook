@@ -14,6 +14,7 @@
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_opengl3.h>
 #include <files.h>
+#include <light_settings.h>
 
 
 void writeScreenShot(GLFWwindow* window);
@@ -32,6 +33,7 @@ bool useBanding = false;
 int bandLevels = 3;
 static int current_model = 0;
 static std::vector<std::string> models;
+glm::vec4 bgColor = glm::vec4(0.427f, 0.506f, 0.588f, 1.0f);
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -47,7 +49,7 @@ float lastFrame = 0.0f;
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 glm::vec4 rotatedPos(0.0f, 0.0f, 0.0f, 0.0f);
 ImVec4 ambientLightColor = ImVec4(0.1f, 0.1f, 0.1f, 0.1f);
-struct LightSettings {
+/*struct LightSettings {
     bool isEnabled = true;
     float rotationY = 0.0f;  
     float rotationX = 0.0f;  
@@ -55,7 +57,7 @@ struct LightSettings {
     glm::vec3 diffuse  = glm::vec3(0.5f, 0.5f, 0.5f);
     glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
     float intensity = 1.0f;
-};
+};*/
 
 struct LightPreset {
     std::string name;
@@ -300,7 +302,7 @@ int main()
 
         // render
         // ------
-        glClearColor(0.427f, 0.506f, 0.588f, 1.0f);
+        glClearColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // be sure to activate shader when setting uniforms/drawing objects
@@ -401,6 +403,7 @@ int main()
                 ImGui::EndCombo();
             }
             ImGui::SliderFloat("model rotation", &rotation, 0.0f, 2.0f * M_PI);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::Separator();
             ImGui::Text("Light Settings");
             if (ImGui::Button("Add Light") && lights.size() < 8) {
                 lights.push_back(LightSettings());
@@ -456,7 +459,26 @@ int main()
             if (ImGui::Button("Take Screenshot")) {
                 writeScreenShot(window);
             }
+            ImGui::ColorEdit4("Background Color",glm::value_ptr(bgColor));
+            if (ImGui::Button("Reset BG Color")){
+                bgColor = glm::vec4(0.427f, 0.506f, 0.588f, 1.0f);
+            }
             
+            ImGui::Separator();
+            ImGui::Text("Save / Load");
+
+            static char filename[64] = "my_setup";
+            ImGui::InputText("##filename", filename, sizeof(filename));
+
+            if (ImGui::Button("Save")) {
+                saveLightSetup(lights, std::string(filename) + ".json");
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Load")) {
+                std::vector<LightSettings> loaded = loadLightSetup(std::string(filename) + ".json");
+                if (!loaded.empty()) lights = loaded;
+            }
+
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
