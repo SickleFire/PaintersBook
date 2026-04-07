@@ -24,9 +24,97 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods);
 
-// settings
+const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+const float far_plane = 50.0f;
 const unsigned int SCR_WIDTH = 1600;
 const unsigned int SCR_HEIGHT = 900;
+std::vector<LightSettings> lights;
+glm::vec3 getLightPosition(const LightSettings& light);
+
+// Function to create shadow cubemap for a light
+void createShadowCubemap(LightSettings& light) {
+    if (light.shadowCubemap != 0) {
+        glDeleteTextures(1, &light.shadowCubemap);
+        glDeleteFramebuffers(1, &light.shadowMapFBO);
+    }
+    
+    // Create framebuffer
+    glGenFramebuffers(1, &light.shadowMapFBO);
+    
+    // Create cubemap texture
+    glGenTextures(1, &light.shadowCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, light.shadowCubemap);
+    
+    for (unsigned int i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT,
+                     SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    }
+    
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    
+    // Attach cubemap to framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, light.shadowMapFBO);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, light.shadowCubemap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "Shadow framebuffer not complete! Status: " << status << std::endl;
+    }
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// Function to render shadows for all lights
+void renderShadowMaps(Shader& depthShader, Model& model, float rotation) {
+    for (int i = 0; i < lights.size(); i++) {
+        if (!lights[i].isEnabled || !lights[i].castsShadow) continue;
+        
+        glm::vec3 lightPos = getLightPosition(lights[i]);
+        
+        // Setup projection matrices for cubemap faces
+        glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), 
+                                               (float)SHADOW_WIDTH / (float)SHADOW_HEIGHT, 
+                                               0.1f, far_plane);
+        
+        std::vector<glm::mat4> shadowTransforms;
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(1,0,0), glm::vec3(0,-1,0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(-1,0,0), glm::vec3(0,-1,0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0,1,0), glm::vec3(0,1,0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0,-1,0), glm::vec3(0,0,1)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0,0,1), glm::vec3(0,-1,0)));
+        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(0,0,-1), glm::vec3(0,-1,0)));
+        
+        // Render to this light's shadow map
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, lights[i].shadowMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        
+        depthShader.use();
+        for (unsigned int j = 0; j < 6; ++j) {
+            depthShader.setMat4("shadowMatrices[" + std::to_string(j) + "]", shadowTransforms[j]);
+        }
+        depthShader.setVec3("lightPos", lightPos);
+        depthShader.setFloat("far_plane", far_plane);
+        
+        glm::mat4 model_mat = glm::mat4(1.0f);
+        model_mat = glm::rotate(model_mat, rotation, glm::vec3(0.0f, 1.0f, 0.0f));
+        model_mat = glm::scale(model_mat, glm::vec3(0.5f));
+        depthShader.setMat4("model", model_mat);
+        
+        model.Draw(depthShader);
+    }
+    
+    // Restore viewport and framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+}
+// settings
 static float rotation = 0.0f;
 bool cursorEnabled = true;
 bool useBanding = false;
@@ -90,9 +178,6 @@ std::vector<LightPreset> presets = {
     },
 };
 
-glm::vec3 getLightPosition(const LightSettings& light);
-std::vector<LightSettings> lights;
-
 // Grid Lines
 bool showGrid = false;
 glm::mat4 ortho = glm::ortho(0.0f, (float)SCR_WIDTH,
@@ -154,6 +239,7 @@ int main()
     Shader lightingShader("../shaders/colors.vs", "../shaders/colors.fs");
     Shader lightCubeShader("../shaders/light_cube.vs", "../shaders/light_cube.fs");
     Shader shaderGrid("../shaders/grid.vs", "../shaders/grid.fs");
+    Shader depthShader("../shaders/simple_depth.vs", "../shaders/simple_depth.fs", "../shaders/simple_depth.gs");
 
     bool show_demo_window = true;
     bool show_another_window = false;
@@ -284,6 +370,10 @@ int main()
     //push 1 main light to the scene
     lights.push_back(LightSettings());
     lights[0].rotationY = glm::radians(45.0f);  lights[0].rotationX = glm::radians(30.0f);
+
+    for (int i = 0; i < lights.size(); i++) {
+        createShadowCubemap(lights[i]);
+    }
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -302,11 +392,26 @@ int main()
 
         // render
         // ------
+        renderShadowMaps(depthShader, ourModel, rotation);
+
         glClearColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Restore viewport
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // be sure to activate shader when setting uniforms/drawing objects
         lightingShader.use();
+        for (int i = 0; i < lights.size(); i++) {
+            glActiveTexture(GL_TEXTURE5 + i);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, lights[i].shadowCubemap);
+            lightingShader.setInt("shadowCubemaps[" + std::to_string(i) + "]", 5 + i);
+        }
+        lightingShader.setFloat("far_plane", far_plane);
+        lightingShader.setInt("shadowCubemap", 5);
+        lightingShader.setFloat("far_plane", far_plane);
         lightingShader.setVec3("material.ambient", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("material.diffuse", 1.0f, 1.0f, 1.0f);
         lightingShader.setVec3("material.specular", 0.5f, 0.5f, 0.5f);
@@ -407,6 +512,7 @@ int main()
             ImGui::Text("Light Settings");
             if (ImGui::Button("Add Light") && lights.size() < 8) {
                 lights.push_back(LightSettings());
+                createShadowCubemap(lights.back());
             }
             for (int i = 0; i < lights.size(); i++) {
                 ImGui::PushID(i); // critical - makes each section unique
@@ -442,6 +548,9 @@ int main()
             for (int i = 0; i < presets.size(); i++) {
                 if (ImGui::Button(presets[i].name.c_str())) {
                     lights = presets[i].lights; // replace current lights with preset
+                    for (int j = 0; j < lights.size(); j++){
+                        createShadowCubemap(lights[j]);
+                    }
                 }
                 if (i < presets.size() - 1) ImGui::SameLine();
             }

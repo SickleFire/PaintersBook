@@ -31,21 +31,36 @@ uniform vec3 viewPos;
 uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_specular1;
 uniform sampler2D texture_roughness1;
+uniform samplerCube shadowCubemaps[MAX_LIGHTS];
+uniform float far_plane;
 
 vec4 diffuseColor;
 
-vec3 CalcLight(Light light, vec3 norm, vec3 viewDir, vec3 diffuseRGB, vec3 specularRGB, float roughness){
+float ShadowCalculation(int lightIndex,vec3 fragPos, vec3 lightPos)
+{
+    vec3 fragToLight = fragPos - lightPos;
+    float closestDepth = texture(shadowCubemaps[lightIndex], fragToLight).r;
+    closestDepth *= far_plane;
+    float currentDepth = length(fragToLight);
+    float bias = 0.05;
+    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    return shadow;
+}
+
+
+vec3 CalcLight(int lightIndex, Light light, vec3 norm, vec3 viewDir, vec3 diffuseRGB, vec3 specularRGB, float roughness){
     if (light.isEnabled){
+        float shadow = ShadowCalculation(lightIndex, FragPos, light.position);
         
         // diffuse 
         vec3 lightDir = normalize(light.position - FragPos);
         float diff = max(dot(norm, lightDir), 0.0);
-        vec3 diffuse  = light.diffuse * (diff * vec3(diffuseRGB));
+        vec3 diffuse  = light.diffuse * (diff * vec3(diffuseRGB)) * (1.0 - shadow);
 
         // specular
         vec3 reflectDir = reflect(-lightDir, norm);  
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), (roughness));
-        vec3 specular = light.specular * (spec * vec3(specularRGB));   
+        vec3 specular = light.specular * (spec * vec3(specularRGB)) * (1.0 - shadow);   
 
         return diffuse + specular;
     }else{
@@ -88,7 +103,7 @@ void main()
         }
     }else {
         for (int i = 0; i < numLights; i++){
-            result += CalcLight(lights[i], norm, viewDir, vec3(diffuseColor), vec3(specularColor), roughnessColor);
+            result += CalcLight(i, lights[i], norm, viewDir, vec3(diffuseColor), vec3(specularColor), roughnessColor);
         }
     }
 
