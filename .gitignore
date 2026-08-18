@@ -36,4 +36,5 @@ include/assimp/
 include/glad/
 include/GLFW/
 include/KHR/
+include/imgui
 
