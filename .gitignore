@@ -37,4 +37,6 @@ include/glad/
 include/GLFW/
 include/KHR/
 include/imgui
-
+include/stb_image_write.h
+include/stb_image.h
+include/json.hpp
